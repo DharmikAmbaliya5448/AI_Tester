@@ -7,24 +7,53 @@
  * @param {string} code - The source code content as a string.
  * @returns {{functions: string[], classes: string[]}} An object containing arrays of found function and class names.
  */
-function findFunctionsAndClasses(code) {
-  const functions = [];
-  const classes = [];
+function findFunctionsAndClasses(code, changes = null) {
+  const functions = new Set();
+  const classes = new Set();
+  const newFunctions = new Set();
+  const newClasses = new Set();
 
   // Regex to find function declarations: function functionName(...)
   const functionRegex = /function\s+([a-zA-Z0-9_]+)\s*\(/g;
   let match;
+
+  // If we have diff changes, check which functions are new
+  if (changes && changes.added) {
+    changes.added.forEach(line => {
+      while ((match = functionRegex.exec(line)) !== null) {
+        newFunctions.add(match[1]);
+      }
+    });
+  }
+
+  // Find all functions in the code
   while ((match = functionRegex.exec(code)) !== null) {
-    functions.push(match[1]);
+    functions.add(match[1]);
   }
 
   // Regex to find class declarations: class ClassName { ... }
   const classRegex = /class\s+([a-zA-Z0-9_]+)\s*\{/g;
-  while ((match = classRegex.exec(code)) !== null) {
-    classes.push(match[1]);
+  
+  // If we have diff changes, check which classes are new
+  if (changes && changes.added) {
+    changes.added.forEach(line => {
+      while ((match = classRegex.exec(line)) !== null) {
+        newClasses.add(match[1]);
+      }
+    });
   }
 
-  return { functions, classes };
+  // Find all classes in the code
+  while ((match = classRegex.exec(code)) !== null) {
+    classes.add(match[1]);
+  }
+
+  return {
+    functions: Array.from(functions),
+    classes: Array.from(classes),
+    newFunctions: Array.from(newFunctions),
+    newClasses: Array.from(newClasses)
+  };
 }
 
 /**

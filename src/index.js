@@ -19,10 +19,8 @@ const git = simpleGit(); // Initialize simple-git
 async function main() {
   console.log("Starting AI Unit Test Generator...");
 
-  // Using path.resolve with __dirname to create a reliable, absolute path.
-  const changedFiles = [
-    path.resolve(__dirname, "sample_code/math_operations.js"),
-  ];
+  // Get staged files and their changes
+  const { files: changedFiles, changes } = await getStagedFiles();
 
   if (changedFiles.length === 0) {
     console.log("No new/changed JavaScript files to test.");
@@ -37,9 +35,12 @@ async function main() {
       const fileContent = await fs.readFile(filePath, "utf-8");
       const baseName = path.basename(filePath, ".js");
 
-      // 2. Find all functions and classes in the file.
-      const { functions, classes } = findFunctionsAndClasses(fileContent);
-      const itemsToTest = [...functions, ...classes];
+      // 2. Find all functions and classes in the file, highlighting new ones.
+      const { functions, classes, newFunctions, newClasses } = 
+        findFunctionsAndClasses(fileContent, changes[filePath]);
+      
+      // Only test new functions and classes
+      const itemsToTest = [...newFunctions, ...newClasses];
 
       if (itemsToTest.length === 0) {
         console.log(`No functions or classes found in '${filePath}'.`);
@@ -65,11 +66,27 @@ async function main() {
         allTestsContent += generatedTest + "\n\n";
       }
 
-      // 6. Write the generated tests to a new file.
+      // 6. Append the generated tests to the existing test file or create a new one
       if (allTestsContent) {
         const testFileName = `${baseName}.test.js`;
         const testFilePath = path.join(path.dirname(filePath), testFileName);
-        await fs.writeFile(testFilePath, allTestsContent.trim());
+        
+        // Check if test file exists
+        let existingContent = '';
+        try {
+          existingContent = await fs.readFile(testFilePath, 'utf-8');
+        } catch (err) {
+          // File doesn't exist, that's fine
+        }
+
+        // If file exists, append new tests, otherwise create new file
+        if (existingContent) {
+          // Append new tests to existing file
+          await fs.writeFile(testFilePath, existingContent + '\n\n' + allTestsContent.trim());
+        } else {
+          // Create new file
+          await fs.writeFile(testFilePath, allTestsContent.trim());
+        }
         console.log(`✅ Successfully created test file at: ${testFilePath}`);
 
         // 7. NEW: Automatically add, commit, and push the file to Git.

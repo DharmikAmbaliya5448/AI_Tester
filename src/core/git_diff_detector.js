@@ -11,17 +11,42 @@ const git = simpleGit();
  */
 async function getStagedFiles() {
   try {
-    // Executes 'git diff --cached --name-only' to get staged files.
-    const diff = await git.diff(["--cached", "--name-only"]);
-    if (!diff) {
+    // Get the staged diff with content
+    const diffResult = await git.diff(["--cached", "--unified=0"]);
+    if (!diffResult) {
       console.log("No changes in the Git staging area.");
-      return [];
+      return { files: [], changes: {} };
     }
-    // Splits the output into an array of file names and filters for .js files.
-    return diff.split("\n").filter((file) => file.endsWith(".js") && file);
+
+    // Parse the diff to get both files and their changes
+    const files = [];
+    const changes = {};
+    
+    const diffLines = diffResult.split('\n');
+    let currentFile = null;
+    
+    for (const line of diffLines) {
+      if (line.startsWith('diff --git')) {
+        // New file in diff
+        currentFile = line.split(' b/')[1];
+        if (currentFile.endsWith('.js')) {
+          files.push(currentFile);
+          changes[currentFile] = { added: [], modified: [] };
+        }
+      } else if (currentFile && currentFile.endsWith('.js')) {
+        // Track added/modified lines
+        if (line.startsWith('+') && !line.startsWith('+++')) {
+          changes[currentFile].added.push(line.substring(1));
+        } else if (line.startsWith('-') && !line.startsWith('---')) {
+          changes[currentFile].modified.push(line.substring(1));
+        }
+      }
+    }
+
+    return { files: files.filter(f => f.endsWith('.js')), changes };
   } catch (error) {
     console.error("Error detecting Git diff:", error);
-    return [];
+    return { files: [], changes: {} };
   }
 }
 
