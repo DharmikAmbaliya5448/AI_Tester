@@ -1,5 +1,4 @@
 // FILE: src/core/prompt_template.js
-// This module creates a detailed prompt for the Gemini AI model.
 
 /**
  * Creates a prompt to generate a Jest unit test for a given function.

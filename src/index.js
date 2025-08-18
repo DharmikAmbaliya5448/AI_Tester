@@ -1,116 +1,109 @@
 // FILE: src/index.js
-// This file is updated to automatically add, commit, and push the generated test file to Git.
 
-require("dotenv").config(); // Load environment variables at the top.
 
 const fs = require("fs/promises");
 const path = require("path");
-const simpleGit = require("simple-git"); // Import simple-git
-const { getStagedFiles } = require("./core/git_diff_detector.js");
+const simpleGit = require("simple-git");
 const {
-  findFunctionsAndClasses,
-  getSourceCode,
+    getChangedFilesSinceLastCommit,
+} = require("./core/git_diff_detector.js");
+const {
+    findFunctionsAndClasses,
+    getSourceCode,
+    findExistingTests,
 } = require("./core/function_locator.js");
 const { createJestPrompt } = require("./core/prompt_template.js");
 const { generateTestCode } = require("./core/llm_integration.js");
 
-const git = simpleGit(); // Initialize simple-git
+const git = simpleGit();
+require("dotenv").config();
 
 async function main() {
   console.log("Starting AI Unit Test Generator...");
 
-  // Get staged files and their changes
-  const { files: changedFiles, changes } = await getStagedFiles();
+  const changedFilesRelative = await getChangedFilesSinceLastCommit();
 
-  if (changedFiles.length === 0) {
-    console.log("No new/changed JavaScript files to test.");
+  if (changedFilesRelative.length === 0) {
+    console.log("No .js files were changed in the last commit. Exiting.");
     return;
   }
 
-  console.log(`Found changed files: ${changedFiles.join(", ")}`);
+  const changedFiles = changedFilesRelative.map((file) =>
+    path.resolve(process.cwd(), file)
+  );
+
+  console.log(`Found changed files in last commit: ${changedFiles.join(", ")}`);
 
   for (const filePath of changedFiles) {
     try {
-      // 1. Read the content of the changed file.
       const fileContent = await fs.readFile(filePath, "utf-8");
       const baseName = path.basename(filePath, ".js");
+      const testFileName = `${baseName}.test.js`;
+      const testFilePath = path.join(path.dirname(filePath), testFileName);
 
-      // 2. Find all functions and classes in the file, highlighting new ones.
-      const { functions, classes, newFunctions, newClasses } = 
-        findFunctionsAndClasses(fileContent, changes[filePath]);
-      
-      // Only test new functions and classes
-      const itemsToTest = [...newFunctions, ...newClasses];
+      const { functions } = findFunctionsAndClasses(fileContent);
+      if (functions.length === 0) {
+        console.log(`No functions found in '${filePath}'.`);
+        continue;
+      }
 
-      if (itemsToTest.length === 0) {
-        console.log(`No functions or classes found in '${filePath}'.`);
+      let alreadyTestedFunctions = [];
+      let isNewTestFile = true;
+      try {
+        const testFileContent = await fs.readFile(testFilePath, "utf-8");
+        isNewTestFile = false;
+        alreadyTestedFunctions = findExistingTests(testFileContent);
+      } catch (error) {
+        // Test file doesn't exist, which is fine.
+      }
+
+      const functionsToTest = functions.filter(
+        (func) => !alreadyTestedFunctions.includes(func)
+      );
+
+      if (functionsToTest.length === 0) {
+        console.log(
+          `No new functions to test in ${baseName}.js. Everything is up to date.`
+        );
         continue;
       }
 
       console.log(
-        `Found items to test in '${filePath}': ${itemsToTest.join(", ")}`
+        `New functions to test in ${baseName}.js: ${functionsToTest.join(", ")}`
       );
-      let allTestsContent = "";
+      let newTestsContent = "";
 
-      for (const itemName of itemsToTest) {
-        // 3. Get the source code for each item.
+      for (const itemName of functionsToTest) {
         const itemCode = getSourceCode(fileContent, itemName);
         if (!itemCode) continue;
 
-        // 4. Create a prompt for the AI model.
         const prompt = createJestPrompt(itemCode, itemName, baseName + ".js");
-
-        // 5. Call the AI model to generate the test code.
-        console.log(`Generating tests for '${itemName}'...`);
+        console.log(`Generating tests for new function '${itemName}'...`);
         const generatedTest = await generateTestCode(prompt);
-        allTestsContent += generatedTest + "\n\n";
+        newTestsContent += "\n" + generatedTest + "\n";
       }
 
-      // 6. Append the generated tests to the existing test file or create a new one
-      if (allTestsContent) {
-        const testFileName = `${baseName}.test.js`;
-        const testFilePath = path.join(path.dirname(filePath), testFileName);
-        
-        // Check if test file exists
-        let existingContent = '';
-        try {
-          existingContent = await fs.readFile(testFilePath, 'utf-8');
-        } catch (err) {
-          // File doesn't exist, that's fine
-        }
-
-        // If file exists, append new tests, otherwise create new file
-        if (existingContent) {
-          // Append new tests to existing file
-          await fs.writeFile(testFilePath, existingContent + '\n\n' + allTestsContent.trim());
-        } else {
-          // Create new file
-          await fs.writeFile(testFilePath, allTestsContent.trim());
-        }
-        console.log(`✅ Successfully created test file at: ${testFilePath}`);
-
-        // 7. NEW: Automatically add, commit, and push the file to Git.
-        console.log("\nStarting Git operations...");
-        try {
-          // Git Add
-          await git.add(testFilePath);
-          console.log(`Git: Added '${testFileName}' to the staging area.`);
-
-          // Git Commit
-          const commitMessage = `feat: Add AI-generated tests for ${baseName}`;
-          await git.commit(commitMessage);
-          console.log(`Git: Committed with message "${commitMessage}"`);
-
-          // Git Push
-          // NOTE: This assumes your remote is named 'origin' and branch is 'main'.
-          await git.push("origin", "main");
-          console.log(`✅ Git: Successfully pushed changes to origin/main.`);
-        } catch (gitError) {
-          console.error("❌ Git operation failed:", gitError.message);
-          console.error(
-            "Please ensure your repository is configured correctly (e.g., remote 'origin' exists) and you have the necessary permissions."
+      if (newTestsContent) {
+        if (isNewTestFile) {
+          const initialContent = `const { ${functions.join(
+            ", "
+          )} } = require('./${baseName}.js');\n`;
+          await fs.writeFile(
+            testFilePath,
+            initialContent + newTestsContent.trim()
           );
+        } else {
+          await fs.appendFile(testFilePath, newTestsContent);
         }
+        console.log(
+          `✅ Successfully created/updated test file at: ${testFilePath}`
+        );
+
+        console.log("\nStarting Git operations...");
+        await git.add(testFilePath);
+        await git.commit(`feat: Add AI-generated tests for ${baseName}`);
+        await git.push("origin", "main");
+        console.log(`✅ Git: Successfully pushed test updates to origin/main.`);
       }
     } catch (error) {
       console.error(`Failed to process file '${filePath}':`, error);

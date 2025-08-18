@@ -1,53 +1,30 @@
 // FILE: src/core/git_diff_detector.js
-// This module is responsible for detecting which files have been changed in Git.
 
 const simpleGit = require("simple-git");
-
 const git = simpleGit();
 
 /**
- * Gets a list of staged files from Git that have been modified.
- * @returns {Promise<string[]>} A promise that resolves to an array of file paths.
+ * Gets a list of files that were changed in the last commit.
+ * It compares the latest commit (HEAD) with the one before it (HEAD~1).
+ * @returns {Promise<string[]>} A promise that resolves to an array of changed file paths.
  */
-async function getStagedFiles() {
+async function getChangedFilesSinceLastCommit() {
   try {
-    // Get the staged diff with content
-    const diffResult = await git.diff(["--cached", "--unified=0"]);
-    if (!diffResult) {
-      console.log("No changes in the Git staging area.");
-      return { files: [], changes: {} };
+    // This command compares the last commit with the one before it.
+    const diff = await git.diff(["HEAD~1", "HEAD", "--name-only"]);
+    if (!diff) {
+      console.log("No changes found between the last two commits.");
+      return [];
     }
-
-    // Parse the diff to get both files and their changes
-    const files = [];
-    const changes = {};
-    
-    const diffLines = diffResult.split('\n');
-    let currentFile = null;
-    
-    for (const line of diffLines) {
-      if (line.startsWith('diff --git')) {
-        // New file in diff
-        currentFile = line.split(' b/')[1];
-        if (currentFile.endsWith('.js')) {
-          files.push(currentFile);
-          changes[currentFile] = { added: [], modified: [] };
-        }
-      } else if (currentFile && currentFile.endsWith('.js')) {
-        // Track added/modified lines
-        if (line.startsWith('+') && !line.startsWith('+++')) {
-          changes[currentFile].added.push(line.substring(1));
-        } else if (line.startsWith('-') && !line.startsWith('---')) {
-          changes[currentFile].modified.push(line.substring(1));
-        }
-      }
-    }
-
-    return { files: files.filter(f => f.endsWith('.js')), changes };
+    // Returns an array of file names that were changed.
+    return diff.split("\n").filter((file) => file.endsWith(".js") && file);
   } catch (error) {
-    console.error("Error detecting Git diff:", error);
-    return { files: [], changes: {} };
+    console.error("Error detecting Git diff between last two commits:", error);
+    console.log(
+      "This can happen if there is only one commit in the repository's history."
+    );
+    return [];
   }
 }
 
-module.exports = { getStagedFiles };
+module.exports = { getChangedFilesSinceLastCommit };
