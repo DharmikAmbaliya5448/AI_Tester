@@ -32,12 +32,17 @@ function mod(a, b) {
   return a % b;
 }
 
+const mySqrt = (a) => {
+  return Math.sqrt(a);
+}
+
 module.exports = {
   add,
   multiply,
   sub,
   mod,
   div,
-  pow
+  pow, 
+  mySqrt
 };
 
