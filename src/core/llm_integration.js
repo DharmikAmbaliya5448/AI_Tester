@@ -1,5 +1,3 @@
-// FILE: src/core/llm_integration.js
-
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const API_KEY = process.env.GEMINI_API_KEY;

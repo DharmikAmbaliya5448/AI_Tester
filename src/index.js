@@ -1,7 +1,5 @@
 // FILE: src/index.js
-// This file is updated to use the new Git diff logic automatically.
-
-require("dotenv").config();
+// This file is updated to target the user_crud.js file for testing.
 
 const fs = require("fs/promises");
 const path = require("path");
@@ -16,26 +14,21 @@ const {
 } = require("./core/function_locator.js");
 const { createJestPrompt } = require("./core/prompt_template.js");
 const { generateTestCode } = require("./core/llm_integration.js");
+const app = require("./api_server/server.js");
 
 const git = simpleGit();
+require("dotenv").config();
 
 async function main() {
   console.log("Starting AI Unit Test Generator...");
 
-  // Step 1: Automatically get the list of files changed in the last commit.
-  const changedFilesRelative = await getChangedFilesSinceLastCommit();
-
-  if (changedFilesRelative.length === 0) {
+  if (app.length === 0) {
     console.log("No .js files were changed in the last commit. Exiting.");
     return;
   }
 
-  // Convert relative paths from git to absolute paths for the script to read.
-  const changedFiles = changedFilesRelative.map((file) =>
-    path.resolve(process.cwd(), file)
-  );
-
-  console.log(`Found changed files in last commit: ${changedFiles.join(", ")}`);
+  const changedFiles = app.map((file) => path.resolve(process.cwd(), file));
+  console.log(`Found changed files to process: ${changedFiles.join(", ")}`);
 
   for (const filePath of changedFiles) {
     try {
@@ -65,15 +58,11 @@ async function main() {
       );
 
       if (functionsToTest.length === 0) {
-        console.log(
-          `No new functions to test in ${baseName}.js. Everything is up to date.`
-        );
+        console.log(`No new functions to test in ${baseName}.js.`);
         continue;
       }
 
-      console.log(
-        `New functions to test in ${baseName}.js: ${functionsToTest.join(", ")}`
-      );
+      console.log(`New functions to test: ${functionsToTest.join(", ")}`);
       let newTestsContent = "";
 
       for (const itemName of functionsToTest) {
@@ -81,7 +70,7 @@ async function main() {
         if (!itemCode) continue;
 
         const prompt = createJestPrompt(itemCode, itemName, baseName + ".js");
-        console.log(`Generating tests for new function '${itemName}'...`);
+        console.log(`Generating tests for function '${itemName}'...`);
         const generatedTest = await generateTestCode(prompt);
         newTestsContent += "\n" + generatedTest + "\n";
       }

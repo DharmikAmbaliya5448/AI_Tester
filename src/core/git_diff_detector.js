@@ -1,14 +1,6 @@
-// FILE: src/core/git_diff_detector.js
-// This file is updated to detect changes between the last two commits.
-
 const simpleGit = require("simple-git");
 const git = simpleGit();
 
-/**
- * Gets a list of files that were changed in the last commit.
- * It compares the latest commit (HEAD) with the one before it (HEAD~1).
- * @returns {Promise<string[]>} A promise that resolves to an array of changed file paths.
- */
 async function getChangedFilesSinceLastCommit() {
   try {
     // This command compares the last commit with the one before it.
