@@ -1,26 +1,28 @@
 // FILE: src/index.js
+// This file is updated to use the new Git diff logic automatically.
 
+require("dotenv").config();
 
 const fs = require("fs/promises");
 const path = require("path");
 const simpleGit = require("simple-git");
 const {
-    getChangedFilesSinceLastCommit,
+  getChangedFilesSinceLastCommit,
 } = require("./core/git_diff_detector.js");
 const {
-    findFunctionsAndClasses,
-    getSourceCode,
-    findExistingTests,
+  findFunctionsAndClasses,
+  getSourceCode,
+  findExistingTests,
 } = require("./core/function_locator.js");
 const { createJestPrompt } = require("./core/prompt_template.js");
 const { generateTestCode } = require("./core/llm_integration.js");
 
 const git = simpleGit();
-require("dotenv").config();
 
 async function main() {
   console.log("Starting AI Unit Test Generator...");
 
+  // Step 1: Automatically get the list of files changed in the last commit.
   const changedFilesRelative = await getChangedFilesSinceLastCommit();
 
   if (changedFilesRelative.length === 0) {
@@ -28,6 +30,7 @@ async function main() {
     return;
   }
 
+  // Convert relative paths from git to absolute paths for the script to read.
   const changedFiles = changedFilesRelative.map((file) =>
     path.resolve(process.cwd(), file)
   );
@@ -85,7 +88,8 @@ async function main() {
 
       if (newTestsContent) {
         if (isNewTestFile) {
-          const initialContent = `const { ${functions.join(
+          const allFuncs = findFunctionsAndClasses(fileContent).functions;
+          const initialContent = `const { ${allFuncs.join(
             ", "
           )} } = require('./${baseName}.js');\n`;
           await fs.writeFile(

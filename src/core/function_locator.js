@@ -1,4 +1,5 @@
 // FILE: src/core/function_locator.js
+// This module is updated with a new function to find existing tests.
 
 /**
  * Extracts function and class names from a source code string.
@@ -50,7 +51,7 @@ function getSourceCode(code, name) {
 }
 
 /**
- * Finds all functions that are already tested in a Jest file.
+ * NEW FUNCTION: Finds all functions that are already tested in a Jest file.
  * It looks for `describe('functionName', ...)` blocks.
  * @param {string} testFileContent - The content of the .test.js file.
  * @returns {string[]} An array of function names that already have tests.
@@ -68,5 +69,5 @@ function findExistingTests(testFileContent) {
 module.exports = {
   findFunctionsAndClasses,
   getSourceCode,
-  findExistingTests,
+  findExistingTests, // Export the new function
 };

@@ -1,4 +1,5 @@
 // FILE: src/core/git_diff_detector.js
+// This file is updated to detect changes between the last two commits.
 
 const simpleGit = require("simple-git");
 const git = simpleGit();
