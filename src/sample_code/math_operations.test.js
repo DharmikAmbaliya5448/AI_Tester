@@ -139,3 +139,51 @@ describe('sub', () => {
     expect(sub(undefined, undefined)).toBe(NaN);
   });
 });
+const { div } = require('./math_operations.js');
+
+describe('div', () => {
+  test('should correctly divide two positive numbers', () => {
+    expect(div(10, 2)).toBe(5);
+  });
+
+  test('should correctly divide a positive number by a negative number', () => {
+    expect(div(10, -2)).toBe(-5);
+  });
+
+  test('should correctly divide a negative number by a positive number', () => {
+    expect(div(-10, 2)).toBe(-5);
+  });
+
+  test('should correctly divide two negative numbers', () => {
+    expect(div(-10, -2)).toBe(5);
+  });
+
+  test('should handle division with zero as numerator', () => {
+    expect(div(0, 2)).toBe(0);
+  });
+
+  test('should throw an error when dividing by zero', () => {
+    expect(() => div(10, 0)).toThrowError("Division by zero is not allowed.");
+  });
+
+  test('should throw an error when dividing by zero with negative numerator', () => {
+    expect(() => div(-10, 0)).toThrowError("Division by zero is not allowed.");
+  });
+
+
+  test('should handle division with 1 as numerator', () => {
+    expect(div(1,2)).toBe(0.5);
+  });
+
+  test('should handle division with 1 as denominator', () => {
+    expect(div(10,1)).toBe(10);
+  });
+
+  test('should handle division with negative 1 as denominator', () => {
+    expect(div(10,-1)).toBe(-10);
+  });
+
+  test('should handle division with negative 1 as numerator', () => {
+    expect(div(-1,2)).toBe(-0.5);
+  });
+});
